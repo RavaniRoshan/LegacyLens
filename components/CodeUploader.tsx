@@ -29,7 +29,7 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [stats, setStats] = useState<{ charCount: number } | null>(null);
+  const [stats, setStats] = useState<{ charCount: number; truncated?: boolean } | null>(null);
   const [extractedContext, setExtractedContext] = useState<string>('');
   const [loadingMessage, setLoadingMessage] = useState<string>(LOADING_MESSAGES[0]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -98,6 +98,10 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
             else setLoadingMessage("Preparing Payload for Gemini...");
         });
 
+        if (!fullContext || fullContext.trim().length === 0) {
+            throw new Error("No readable source code found in archive. Please check the file format.");
+        }
+
         console.log('--- Processing Complete ---');
         setStats({ charCount: fullContext.length });
         setExtractedContext(fullContext);
@@ -110,9 +114,25 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
   };
 
   const handleAnalysis = async () => {
-    if (!extractedContext) return;
+    if (!extractedContext) {
+         setErrorMessage("Context is empty. Please upload a valid zip file.");
+         setStatus('error');
+         return;
+    }
+
     setStatus('analyzing');
     setProgress(0);
+    
+    // Payload Size Management (max ~3.5MB safely)
+    let payload = extractedContext;
+    let isTruncated = false;
+    const MAX_PAYLOAD_SIZE = 3500000;
+    
+    if (payload.length > MAX_PAYLOAD_SIZE) {
+        console.warn("Payload exceeding safe limits. Truncating.");
+        payload = payload.substring(0, MAX_PAYLOAD_SIZE) + "\n\n[SYSTEM: CONTEXT TRUNCATED DUE TO SIZE LIMITS]";
+        isTruncated = true;
+    }
     
     // Start interval to cycle messages and fake progress
     let msgIdx = 0;
@@ -132,9 +152,15 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
         });
     }, 1200);
 
+    // Timeout Controller
+    const controller = new AbortController();
+    // 90s timeout for analysis
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
     try {
-      const graphData = await analyzeCodebase(extractedContext);
+      const graphData = await analyzeCodebase(payload, controller.signal);
       
+      clearTimeout(timeoutId);
       clearInterval(interval);
       setProgress(100);
       setLoadingMessage("Analysis Complete. Rendering Graph...");
@@ -144,9 +170,18 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
       }, 500);
 
     } catch (error: any) {
+      clearTimeout(timeoutId);
       clearInterval(interval);
       console.error("Analysis failed:", error);
-      setErrorMessage(error.message || "AI Analysis failed. Check your API key.");
+      
+      let msg = error.message || "AI Analysis failed. Check your API key.";
+      if (error.name === 'AbortError') {
+          msg = "Timeout: The codebase is too large/complex for the current analysis tier (90s limit).";
+      } else if (msg.includes("413")) {
+          msg = "Payload Too Large: The repo exceeds the maximum upload size.";
+      }
+
+      setErrorMessage(msg);
       setStatus('error');
     }
   };
@@ -249,7 +284,7 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
               <p className="text-lg text-zinc-500 mb-8 max-w-md">
                 or paste massive concatenated file.
                 <br />
-                <span className="text-xs uppercase tracking-widest text-zinc-600 mt-2 block">[ MAX SIZE: 500MB ]</span>
+                <span className="text-xs uppercase tracking-widest text-zinc-600 mt-2 block">[ MAX SIZE: 4MB Text Content ]</span>
               </p>
 
               {/* No-Code Escape Hatch */}
@@ -338,12 +373,19 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
                     <div className="mt-4 flex justify-center gap-4">
                          <div className="px-4 py-2 bg-zinc-900 border border-zinc-800">
                              <span className="text-zinc-500 text-xs uppercase block">Size</span>
-                             <span className="text-white font-bold">{(stats.charCount / 1024).toFixed(0)} KB</span>
+                             <span className={cn("font-bold", stats.charCount > 3500000 ? "text-yellow-500" : "text-white")}>
+                                {(stats.charCount / 1024).toFixed(0)} KB
+                             </span>
                          </div>
                          <div className="px-4 py-2 bg-zinc-900 border border-zinc-800">
                              <span className="text-zinc-500 text-xs uppercase block">Status</span>
                              <span className="text-green-500 font-bold">Ready</span>
                          </div>
+                    </div>
+                )}
+                {stats?.charCount && stats.charCount > 3500000 && (
+                    <div className="mt-2 text-yellow-500 text-xs font-bold uppercase tracking-widest bg-yellow-900/10 border border-yellow-900/30 p-2">
+                        Warning: Large Repository. Will be truncated for analysis.
                     </div>
                 )}
               </div>
@@ -378,7 +420,7 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
               </div>
               <div className="text-center">
                 <h3 className="text-2xl font-black text-red-500 uppercase tracking-tighter">System Malfunction</h3>
-                <p className="text-zinc-400 text-sm mt-4 max-w-lg border border-red-900/50 bg-red-900/10 p-4 font-mono text-left">
+                <p className="text-zinc-400 text-sm mt-4 max-w-lg border border-red-900/50 bg-red-900/10 p-4 font-mono text-left break-words">
                     <span className="text-red-500 mr-2">Error:</span>
                     {errorMessage}
                 </p>

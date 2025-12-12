@@ -26,24 +26,30 @@ interface APIResponse {
   edges: APIEdge[];
 }
 
-export const analyzeCodebase = async (fullContext: string): Promise<{ nodes: Node[], edges: Edge[], summary: string, suggestions?: string[] }> => {
+export const analyzeCodebase = async (fullContext: string, signal?: AbortSignal): Promise<{ nodes: Node[], edges: Edge[], summary: string, suggestions?: string[] }> => {
   try {
     const response = await fetch('/api/analyze-codebase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullContext })
+        body: JSON.stringify({ fullContext }),
+        signal
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Analysis request failed');
+        // Handle 413 Payload Too Large specifically
+        if (response.status === 413) {
+            throw new Error("Repository is too large for analysis. Please try a smaller subset.");
+        }
+        
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Analysis failed (${response.status})`);
     }
 
     const data: APIResponse = await response.json();
 
     // Map API nodes to React Flow nodes
     // Note: Position is set to 0,0 here, layout is handled by Dagre in the component
-    const nodes: Node[] = data.nodes.map((node) => ({
+    const nodes: Node[] = (data.nodes || []).map((node) => ({
       id: node.id,
       type: node.type === 'fragile' ? 'fragileNode' : 'safeNode', // Map 'standard' to 'safeNode'
       position: { x: 0, y: 0 },
@@ -56,7 +62,7 @@ export const analyzeCodebase = async (fullContext: string): Promise<{ nodes: Nod
       },
     }));
 
-    const edges: Edge[] = data.edges.map((edge) => ({
+    const edges: Edge[] = (data.edges || []).map((edge) => ({
       id: edge.id || `e-${edge.source}-${edge.target}`,
       source: edge.source,
       target: edge.target,
@@ -64,9 +70,24 @@ export const analyzeCodebase = async (fullContext: string): Promise<{ nodes: Nod
       style: { stroke: '#71717a' },
     }));
 
+    // Fallback for empty graph
+    if (nodes.length === 0) {
+        return {
+            nodes: [
+                { id: 'root', position: { x: 0, y: 0 }, data: { label: 'Empty Graph', fragilityScore: 0, details: 'No dependencies found or parsing failed.' }, type: 'safeNode' }
+            ],
+            edges: [],
+            summary: data.summary || "Analysis completed but no graph structure could be determined.",
+            suggestions: data.suggestions || []
+        };
+    }
+
     return { nodes, edges, summary: data.summary, suggestions: data.suggestions };
 
-  } catch (error) {
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+        throw new Error("Analysis timed out (90s limit). The codebase may be too large.");
+    }
     console.error("AI Analysis Failed:", error);
     throw error;
   }

@@ -16,26 +16,47 @@ interface Message {
 
 const STORAGE_KEY = 'legacylens_chat_history_v1';
 
-// Helper: Parse Markdown for Code Blocks
+// Helper: Parse Markdown for Code Blocks (supports streaming unclosed blocks)
 type MessagePart = { type: 'text' | 'code' | 'diff'; content: string; language?: string };
 
 const parseMessage = (content: string): MessagePart[] => {
-    const regex = /```(\w+)?\n([\s\S]*?)```/g;
+    // 1. Match all closed code blocks: ```lang\n...```
+    const blockRegex = /```(\w+)?\n([\s\S]*?)```/g;
     const parts: MessagePart[] = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = regex.exec(content)) !== null) {
+    while ((match = blockRegex.exec(content)) !== null) {
         if (match.index > lastIndex) {
             parts.push({ type: 'text', content: content.slice(lastIndex, match.index) });
         }
         const lang = match[1] || 'text';
         parts.push({ type: lang === 'diff' ? 'diff' : 'code', content: match[2], language: lang });
-        lastIndex = regex.lastIndex;
+        lastIndex = blockRegex.lastIndex;
     }
-    if (lastIndex < content.length) {
-        parts.push({ type: 'text', content: content.slice(lastIndex) });
+
+    // 2. Handle remaining text which might contain an unclosed block (streaming)
+    const remaining = content.slice(lastIndex);
+    // Regex matches: start of string or char, followed by ```, optional lang, newline, then rest of string
+    const unclosedMatch = remaining.match(/```(\w+)?\n([\s\S]*)$/);
+
+    if (unclosedMatch) {
+        const fullMatch = unclosedMatch[0];
+        const matchIndex = remaining.indexOf(fullMatch);
+        
+        // Push text before the unclosed block
+        if (matchIndex > 0) {
+            parts.push({ type: 'text', content: remaining.slice(0, matchIndex) });
+        }
+        
+        const lang = unclosedMatch[1] || 'text';
+        parts.push({ type: lang === 'diff' ? 'diff' : 'code', content: unclosedMatch[2], language: lang });
+    } else {
+        if (remaining) {
+            parts.push({ type: 'text', content: remaining });
+        }
     }
+    
     return parts;
 };
 
@@ -215,8 +236,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, suggestio
             if (contentType && contentType.includes("application/json")) {
                 const data = await response.json();
                 setIsStreaming(false);
+                
                 if (data.image) {
-                    setMessages(prev => [...prev, { role: 'model', content: data.response || "Image generated.", image: data.image }]);
+                    setMessages(prev => [...prev, { 
+                        role: 'model', 
+                        content: data.response || "Visual generated successfully.", 
+                        image: data.image 
+                    }]);
                 } else if (data.response) {
                     setMessages(prev => [...prev, { role: 'model', content: data.response }]);
                 } else if (data.error) {
@@ -228,17 +254,28 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ context, suggestio
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let accumulatedText = '';
+                let firstChunk = true;
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
+                    
+                    if (firstChunk) {
+                        // Optional: Hide thinking indicator as soon as text starts
+                        // setIsStreaming(false); 
+                        firstChunk = false;
+                    }
+
                     const chunk = decoder.decode(value, { stream: true });
                     accumulatedText += chunk;
                     setMessages(prev => {
                         const newMessages = [...prev];
-                        const lastMsg = newMessages[newMessages.length - 1];
-                        if (lastMsg.role === 'model') {
-                            lastMsg.content = accumulatedText;
+                        const lastMsgIndex = newMessages.length - 1;
+                        if (lastMsgIndex >= 0 && newMessages[lastMsgIndex].role === 'model') {
+                             newMessages[lastMsgIndex] = {
+                                ...newMessages[lastMsgIndex],
+                                content: accumulatedText
+                             };
                         }
                         return newMessages;
                     });

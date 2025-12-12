@@ -3,6 +3,10 @@ import { GoogleGenAI } from "@google/genai";
 export async function POST(req: Request) {
   try {
     const { fullContext } = await req.json();
+
+    if (!fullContext || typeof fullContext !== 'string' || fullContext.trim().length === 0) {
+        return Response.json({ error: 'Context is empty. Cannot analyze.' }, { status: 400 });
+    }
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
@@ -74,6 +78,7 @@ Always set "position": { "x": 0, "y": 0 } for all nodes. The frontend will handl
     
   } catch (error: any) {
     console.error('API Analysis Error:', error);
+    // Return a useful error message if possible
     return Response.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
