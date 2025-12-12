@@ -1,11 +1,12 @@
 import React from 'react';
 import { motion, useScroll, useTransform, Variants } from 'framer-motion';
-import { Github, Terminal, Activity, FileArchive, Cpu, Map, ShieldAlert } from 'lucide-react';
+import { Github, Terminal, Activity, FileArchive, Cpu, Map, ShieldAlert, Trophy } from 'lucide-react';
 import { CodeUploader } from './CodeUploader';
 import { Node, Edge } from 'reactflow';
+import { DEMO_DATA, DEMO_CONTEXT } from '../utils/demoData';
 
 interface LandingPageProps {
-  onVisualize: (data: { nodes: Node[], edges: Edge[], summary: string }) => void;
+  onVisualize: (data: { nodes: Node[], edges: Edge[], summary: string, suggestions?: string[] }, context: string) => void;
 }
 
 const containerVariants: Variants = {
@@ -76,7 +77,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onVisualize }) => {
             <div className="w-8 h-8 bg-green-500 flex items-center justify-center border border-green-400 shadow-[2px_2px_0px_0px_rgba(255,255,255,0.2)]">
               <Terminal className="w-5 h-5 text-black" />
             </div>
-            <span className="font-bold text-lg tracking-tighter text-white uppercase">ZipStream<span className="text-green-500">_v1.0</span></span>
+            <span className="font-bold text-lg tracking-tighter text-white uppercase">LegacyLens<span className="text-green-500">_v1.0</span></span>
           </motion.div>
           
           <motion.div 
@@ -84,8 +85,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onVisualize }) => {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-6"
           >
+             <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-900/20 border border-blue-500/50 text-blue-400 text-xs font-bold uppercase tracking-widest rounded-full">
+                <Trophy size={14} />
+                Kaggle Competition Project
+             </div>
              <a 
-                href="https://github.com" 
+                href="https://github.com/RavaniRoshan/LegacyLens" 
                 target="_blank" 
                 rel="noreferrer" 
                 className="text-zinc-500 hover:text-green-500 transition-colors flex items-center gap-2 text-xs uppercase font-bold tracking-widest group"
@@ -93,6 +98,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onVisualize }) => {
                 <Github className="w-4 h-4 group-hover:rotate-12 transition-transform" />
                 Source
             </a>
+            <button
+                onClick={() => onVisualize(DEMO_DATA, DEMO_CONTEXT)}
+                className="bg-green-500 text-black px-5 py-2 text-xs font-bold uppercase tracking-widest border border-green-400 shadow-[2px_2px_0px_0px_rgba(255,255,255,0.3)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+            >
+                Launch App
+            </button>
           </motion.div>
         </div>
       </nav>
@@ -300,7 +311,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onVisualize }) => {
 
       <footer className="border-t border-zinc-800 py-12 bg-black relative z-10">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between text-zinc-600 text-xs uppercase tracking-widest">
-            <span>&copy; 2024 ZipStream Inc. // All systems operational</span>
+            <span>&copy; 2024 LegacyLens Inc. // All systems operational</span>
             <div className="flex gap-8 mt-4 md:mt-0">
                 <a href="#" className="hover:text-green-500 hover:underline decoration-green-500 underline-offset-4">Privacy_Protocol</a>
                 <a href="#" className="hover:text-green-500 hover:underline decoration-green-500 underline-offset-4">Terms_of_Use</a>

@@ -1,5 +1,5 @@
 {
-  "name": "ZipStream Uploader",
-  "description": "A modern, dark-themed drag-and-drop uploader for ZIP files with smooth animations.",
+  "name": "LegacyLens",
+  "description": "The AI Archaeologist for Legacy Code. Turn 1M+ lines of legacy spaghetti code into a living, interactive dependency map.",
   "requestFramePermissions": []
 }

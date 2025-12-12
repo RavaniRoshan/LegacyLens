@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DependencyMap } from './components/DependencyMap';
 import { LandingPage } from './components/LandingPage';
+import { ChatInterface } from './components/ChatInterface';
 import { Github, ArrowLeft, Terminal, Home } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Node, Edge } from 'reactflow';
@@ -9,19 +10,23 @@ interface GraphData {
   nodes: Node[];
   edges: Edge[];
   summary?: string;
+  suggestions?: string[];
 }
 
 export default function App() {
   const [view, setView] = useState<'landing' | 'visualize'>('landing');
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], edges: [] });
+  const [codeContext, setCodeContext] = useState<string>('');
 
-  const handleVisualize = (data: { nodes: Node[], edges: Edge[], summary: string }) => {
+  const handleVisualize = (data: { nodes: Node[], edges: Edge[], summary: string, suggestions?: string[] }, context: string) => {
     setGraphData(data);
+    setCodeContext(context);
     setView('visualize');
   };
 
   const navigateToHome = () => {
     setView('landing');
+    setCodeContext('');
   };
 
   return (
@@ -58,7 +63,7 @@ export default function App() {
                             <div className="w-8 h-8 bg-black flex items-center justify-center border border-zinc-700 group-hover:border-green-500 transition-colors">
                             <Terminal className="w-5 h-5 text-green-500" />
                             </div>
-                            <span className="font-bold text-lg tracking-tight uppercase text-white">ZipStream<span className="text-zinc-600 text-xs ml-1">_MAP</span></span>
+                            <span className="font-bold text-lg tracking-tight uppercase text-white">LegacyLens<span className="text-zinc-600 text-xs ml-1">_MAP</span></span>
                         </div>
                          <button 
                             onClick={navigateToHome}
@@ -76,6 +81,7 @@ export default function App() {
                             initialEdges={graphData.edges} 
                             summary={graphData.summary}
                         />
+                        <ChatInterface context={codeContext} suggestions={graphData.suggestions} />
                     </div>
                 </motion.div>
             )}

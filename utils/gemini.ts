@@ -21,11 +21,12 @@ interface APIEdge {
 
 interface APIResponse {
   summary: string;
+  suggestions?: string[];
   nodes: APINode[];
   edges: APIEdge[];
 }
 
-export const analyzeCodebase = async (fullContext: string): Promise<{ nodes: Node[], edges: Edge[], summary: string }> => {
+export const analyzeCodebase = async (fullContext: string): Promise<{ nodes: Node[], edges: Edge[], summary: string, suggestions?: string[] }> => {
   try {
     const response = await fetch('/api/analyze-codebase', {
         method: 'POST',
@@ -63,7 +64,7 @@ export const analyzeCodebase = async (fullContext: string): Promise<{ nodes: Nod
       style: { stroke: '#71717a' },
     }));
 
-    return { nodes, edges, summary: data.summary };
+    return { nodes, edges, summary: data.summary, suggestions: data.suggestions };
 
   } catch (error) {
     console.error("AI Analysis Failed:", error);

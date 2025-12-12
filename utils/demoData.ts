@@ -1,5 +1,65 @@
 import { Node, Edge } from 'reactflow';
 
+export const DEMO_CONTEXT = `
+// FILE: OrderController.java
+public class OrderController {
+  // God class implementation handling too many responsibilities
+  private Logger logger = new Logger();
+  private AuthService auth = new AuthService();
+
+  public void processOrder(Order order) {
+     if (!auth.check(order.userId)) return;
+
+     // CRITICAL: Direct dependency instantiation
+     LegacyPaymentGateway gw = new LegacyPaymentGateway();
+     gw.charge(order.amount); 
+
+     // Static coupling
+     InventoryManager.update(order.items); 
+     
+     // CRITICAL: SQL Injection Vulnerability
+     String sql = "INSERT INTO orders VALUES (" + order.id + ", " + order.amount + ")";
+     DB_Connection_Pool.execute(sql);
+     
+     EmailService.send(order.userEmail);
+  }
+}
+
+// FILE: LegacyPaymentGateway.java
+public class LegacyPaymentGateway {
+  // CRITICAL: Hardcoded API Credentials
+  private String apiKey = "sk_live_8923748923748923"; 
+  
+  public void charge(double amount) {
+     try {
+       // DEPRECATED: Uses old SSLv3
+       SSLContext ctx = SSLContext.getInstance("SSLv3"); 
+     } catch (Exception e) {
+       // CRITICAL: Swallows exceptions silently
+       System.out.println("Payment error");
+     }
+  }
+}
+
+// FILE: DB_Connection_Pool.java
+public class DB_Connection_Pool {
+   private static List<Connection> pool = new ArrayList<>();
+   
+   // CRITICAL: Not thread safe, deadlock prone
+   public static void execute(String sql) {
+     Connection conn = pool.get(0);
+     conn.run(sql);
+   }
+}
+
+// FILE: InventoryManager.java
+public class InventoryManager {
+    public static void update(List<Item> items) {
+        // Basic CRUD
+    }
+}
+`;
+
 export const DEMO_DATA: { nodes: Node[], edges: Edge[], summary: string } = {
   summary: "Legacy Java 7 Monolith. Analysis reveals a 'God Class' controller with high cyclomatic complexity and critical SQL injection vulnerabilities in the data access layer. High risk of cascading failures.",
   nodes: [

@@ -14,6 +14,7 @@ You will receive a concatenated string of an entire project's source code. Your 
 1. Parse the code to understand the file structure and logic flow.
 2. Construct a dependency graph (which files import/call which other files).
 3. Calculate a "Fragility Score" (0-10) for each file/function.
+4. Generate 3 specific, high-value "Suggested Queries" that a developer should ask about this repo to find critical bugs or understand the architecture.
 
 FRAGILITY SCORING CRITERIA:
 - High Coupling: The file is imported/called by many others.
@@ -26,6 +27,11 @@ Return ONLY raw JSON. Do not use Markdown formatting (no \`\`\`json). The JSON m
 
 {
   "summary": "A 2-sentence executive summary of what this application does.",
+  "suggestions": [
+    "Identify the SQL injection vulnerability in OrderController",
+    "Generate an infographic of the payment flow",
+    "Explain the dependency chain of UserSession"
+  ],
   "nodes": [
     {
       "id": "filename or function name",

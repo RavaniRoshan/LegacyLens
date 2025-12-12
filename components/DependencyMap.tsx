@@ -14,7 +14,7 @@ import ReactFlow, {
 } from 'reactflow';
 import dagre from 'dagre';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, AlertTriangle, CheckCircle, FileCode, ShieldAlert, Database, Braces, Info, CornerDownRight } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, FileCode, ShieldAlert, Database, Braces, Info, CornerDownRight, Search, Filter } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 // --- Layout Utility ---
@@ -124,17 +124,26 @@ interface DependencyMapProps {
 const DependencyMapContent: React.FC<DependencyMapProps> = ({ initialNodes = [], initialEdges = [], summary }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [masterNodes, setMasterNodes] = useState<Node[]>([]);
+  const [masterEdges, setMasterEdges] = useState<Edge[]>([]);
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('ALL'); // ALL, CRITICAL, MODERATE, LOW, FRAGILE, STANDARD
+  
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const { fitView } = useReactFlow();
 
   const nodeTypes = useMemo(() => ({ fragileNode: FragileNode, safeNode: SafeNode }), []);
 
+  // Initialize and Layout
   useEffect(() => {
     if (initialNodes.length > 0) {
         const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
             initialNodes,
             initialEdges
         );
+        setMasterNodes(layoutedNodes);
+        setMasterEdges(layoutedEdges);
         setNodes(layoutedNodes);
         setEdges(layoutedEdges);
         
@@ -143,6 +152,51 @@ const DependencyMapContent: React.FC<DependencyMapProps> = ({ initialNodes = [],
         }, 100);
     }
   }, [initialNodes, initialEdges, setNodes, setEdges, fitView]);
+
+  // Filter Logic
+  useEffect(() => {
+    if (masterNodes.length === 0) return;
+
+    let filteredNodes = masterNodes;
+    
+    // Apply Search
+    if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        filteredNodes = filteredNodes.filter(node => 
+            node.data.label.toLowerCase().includes(query)
+        );
+    }
+
+    // Apply Filter Dropdown
+    if (filterType !== 'ALL') {
+        switch (filterType) {
+            case 'CRITICAL':
+                filteredNodes = filteredNodes.filter(n => n.data.fragilityScore >= 8);
+                break;
+            case 'MODERATE':
+                filteredNodes = filteredNodes.filter(n => n.data.fragilityScore >= 5 && n.data.fragilityScore < 8);
+                break;
+            case 'LOW':
+                filteredNodes = filteredNodes.filter(n => n.data.fragilityScore < 5);
+                break;
+            case 'FRAGILE_TYPE':
+                filteredNodes = filteredNodes.filter(n => n.type === 'fragileNode');
+                break;
+            case 'STANDARD_TYPE':
+                filteredNodes = filteredNodes.filter(n => n.type === 'safeNode');
+                break;
+        }
+    }
+
+    // Update Edges to only show connections between visible nodes
+    const visibleNodeIds = new Set(filteredNodes.map(n => n.id));
+    const filteredEdges = masterEdges.filter(edge => 
+        visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+    );
+
+    setNodes(filteredNodes);
+    setEdges(filteredEdges);
+  }, [searchQuery, filterType, masterNodes, masterEdges, setNodes, setEdges]);
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     setSelectedNode(node);
@@ -171,12 +225,47 @@ const DependencyMapContent: React.FC<DependencyMapProps> = ({ initialNodes = [],
   return (
     <div className="w-full h-[750px] border-2 border-zinc-800 bg-black relative overflow-hidden group font-mono">
         {/* Header Overlay */}
-        <div className="absolute top-0 left-0 right-0 z-10 bg-black/80 backdrop-blur-sm border-b border-zinc-800 p-3 flex justify-between items-center">
+        <div className="absolute top-0 left-0 right-0 z-10 bg-black/80 backdrop-blur-sm border-b border-zinc-800 p-3 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0">
             <h3 className="text-sm font-bold text-green-500 uppercase tracking-widest flex items-center gap-2">
                 <Braces size={16} /> 
                 Dependency_Graph.sys
             </h3>
-            <span className="text-[10px] text-zinc-500 uppercase">Interactive Mode: Active</span>
+
+            {/* Toolbar: Search & Filter */}
+            <div className="flex items-center gap-4">
+                {/* Search Input */}
+                <div className="relative group/search">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within/search:text-green-500 transition-colors" />
+                    <input 
+                        type="text" 
+                        placeholder="SEARCH NODES..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-black border border-zinc-700 text-zinc-300 text-xs pl-9 pr-4 py-1.5 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 w-48 transition-all uppercase placeholder:text-zinc-700"
+                    />
+                </div>
+
+                {/* Filter Dropdown */}
+                <div className="relative group/filter">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within/filter:text-green-500 transition-colors" />
+                    <select 
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value)}
+                        className="appearance-none bg-black border border-zinc-700 text-zinc-300 text-xs pl-9 pr-8 py-1.5 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 cursor-pointer uppercase"
+                    >
+                        <option value="ALL">All Nodes</option>
+                        <option value="CRITICAL">Critical (8-10)</option>
+                        <option value="MODERATE">Moderate (5-7)</option>
+                        <option value="LOW">Low (1-4)</option>
+                        <option value="FRAGILE_TYPE">Type: Fragile</option>
+                        <option value="STANDARD_TYPE">Type: Standard</option>
+                    </select>
+                    {/* Custom Arrow */}
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-zinc-500" />
+                    </div>
+                </div>
+            </div>
         </div>
         
         {/* Summary Overlay */}

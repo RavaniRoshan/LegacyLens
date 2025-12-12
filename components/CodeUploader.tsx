@@ -6,21 +6,21 @@ import { ProgressBar } from './ProgressBar';
 import { processCodebase } from '../utils/fileProcessor';
 import { analyzeCodebase } from '../utils/gemini';
 import { Node, Edge } from 'reactflow';
-import { DEMO_DATA } from '../utils/demoData';
+import { DEMO_DATA, DEMO_CONTEXT } from '../utils/demoData';
 
 type UploadStatus = 'idle' | 'dragging' | 'processing' | 'complete' | 'analyzing' | 'error';
 
 interface CodeUploaderProps {
-  onVisualize: (data: { nodes: Node[], edges: Edge[], summary: string }) => void;
+  onVisualize: (data: { nodes: Node[], edges: Edge[], summary: string }, context: string) => void;
 }
 
 const LOADING_MESSAGES = [
   "Initializing Gemini 3 Pro Environment...",
-  "Reading 45,000 lines of code...",
-  "Parsing AST for COBOL/Java bridge...",
-  "Filling 1M Token Context Window...",
-  "Tracing cross-language dependencies...",
-  "Calculating Fragility Scores...",
+  "Ingesting 1M+ Token Context...",
+  "Parsing Abstract Syntax Tree...",
+  "Tracing Cross-Language Dependencies...",
+  "Identifying Critical Failure Points...",
+  "Calculating Cyclomatic Complexity...",
   "Generating Knowledge Graph..."
 ];
 
@@ -54,15 +54,21 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
     setFileName("Legacy_Checkout_System.zip (Demo)");
     setProgress(0);
 
-    // Fake processing steps
-    for (let i = 0; i < LOADING_MESSAGES.length; i++) {
-        setLoadingMessage(LOADING_MESSAGES[i]);
+    // Fake processing steps for demo
+    const demoMessages = [
+        "Decompressing Archive Stream...",
+        "Reading 45,000 lines of code...",
+        ...LOADING_MESSAGES
+    ];
+
+    for (let i = 0; i < demoMessages.length; i++) {
+        setLoadingMessage(demoMessages[i]);
         // Progress moves from 0 to 100 based on steps
-        const stepProgress = ((i + 1) / LOADING_MESSAGES.length) * 100;
+        const stepProgress = ((i + 1) / demoMessages.length) * 100;
         setProgress(stepProgress);
         
         // Variable delay to feel "real"
-        const delay = 800 + Math.random() * 500;
+        const delay = 600 + Math.random() * 400;
         await new Promise(resolve => setTimeout(resolve, delay));
     }
 
@@ -71,7 +77,7 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
     
     // Auto-analyze for demo after short delay
     setTimeout(() => {
-        onVisualize(DEMO_DATA);
+        onVisualize(DEMO_DATA, DEMO_CONTEXT);
     }, 800);
   };
 
@@ -80,15 +86,16 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
     setFileName(file.name);
     setErrorMessage(null);
     setProgress(0);
-    setLoadingMessage("Extracting Archive Payload...");
+    setLoadingMessage("Initializing Extraction Protocol...");
 
     try {
         const fullContext = await processCodebase(file, (percent) => {
             setProgress(percent);
-            if (percent < 30) setLoadingMessage("Decompressing Stream...");
-            else if (percent < 60) setLoadingMessage("Reading Source Files...");
-            else if (percent < 90) setLoadingMessage("Filtering Binary Assets...");
-            else setLoadingMessage("Finalizing Payload...");
+            if (percent < 20) setLoadingMessage("Decompressing Archive Stream...");
+            else if (percent < 40) setLoadingMessage("Indexing File Structure...");
+            else if (percent < 60) setLoadingMessage("Reading Source Code Lines...");
+            else if (percent < 80) setLoadingMessage("Filtering Binary Assets...");
+            else setLoadingMessage("Preparing Payload for Gemini...");
         });
 
         console.log('--- Processing Complete ---');
@@ -107,19 +114,35 @@ export const CodeUploader: React.FC<CodeUploaderProps> = ({ onVisualize }) => {
     setStatus('analyzing');
     setProgress(0);
     
-    // Simulate progress for analysis phase since API doesn't stream progress
-    let msgIdx = 3; // Start from "Filling 1M Token..."
+    // Start interval to cycle messages and fake progress
+    let msgIdx = 0;
     const interval = setInterval(() => {
+        // Cycle messages
         if (msgIdx < LOADING_MESSAGES.length) {
             setLoadingMessage(LOADING_MESSAGES[msgIdx]);
             msgIdx++;
         }
-    }, 2000);
+        
+        // Fake progress increment - asymptotic to 95%
+        setProgress(prev => {
+            if (prev >= 95) return prev;
+            // Slow down as it gets higher
+            const remaining = 95 - prev;
+            return prev + (remaining * 0.1) + Math.random() * 2;
+        });
+    }, 1200);
 
     try {
       const graphData = await analyzeCodebase(extractedContext);
+      
       clearInterval(interval);
-      onVisualize(graphData);
+      setProgress(100);
+      setLoadingMessage("Analysis Complete. Rendering Graph...");
+      
+      setTimeout(() => {
+          onVisualize(graphData, extractedContext);
+      }, 500);
+
     } catch (error: any) {
       clearInterval(interval);
       console.error("Analysis failed:", error);
