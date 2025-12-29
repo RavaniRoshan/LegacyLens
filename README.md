@@ -66,5 +66,5 @@ View and deploy your app in AI Studio: [https://ai.studio/apps/drive/1DJIodbTqgt
 ---
 
 <div align="center">
-  <sub>Built for the Kaggle Competition. &copy; 2024 LegacyLens Inc.</sub>
+  <sub>Built for the Kaggle Competition. &copy; 2025 LegacyLens Inc.</sub>
 </div>
